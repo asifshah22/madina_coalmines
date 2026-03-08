@@ -1,0 +1,22 @@
+[11-Jun-2024 21:11:25 UTC] PHP Fatal error:  SaleReports cannot use GuzzleHttp\Client - it is not a trait in /home/alsymbwz/public_html/japan_electronics/application/controllers/SaleReports.php on line 6
+[11-Jun-2024 21:12:01 UTC] PHP Fatal error:  require(): Failed opening required '../vendor/autoload.php' (include_path='.:/opt/alt/php73/usr/share/pear') in /home/alsymbwz/public_html/japan_electronics/application/controllers/SaleReports.php on line 2
+[11-Jun-2024 21:12:18 UTC] PHP Fatal error:  require(): Failed opening required '../../vendor/autoload.php' (include_path='.:/opt/alt/php73/usr/share/pear') in /home/alsymbwz/public_html/japan_electronics/application/controllers/SaleReports.php on line 2
+[11-Jun-2024 21:13:00 UTC] PHP Fatal error:  SaleReports cannot use GuzzleHttp\Client - it is not a trait in /home/alsymbwz/public_html/japan_electronics/application/controllers/SaleReports.php on line 6
+[12-Jun-2024 17:22:55 UTC] PHP Fatal error:  Cannot use empty array elements in arrays in /home/alsymbwz/public_html/japan_electronics/application/controllers/Sales.php on line 725
+[21-May-2025 18:51:54 UTC] PHP Deprecated:  Required parameter $CategoryId follows optional parameter $view in /home/alsymbwz/public_html/meesaq_honda/application/controllers/Dashboard.php on line 116
+[21-May-2025 18:52:03 UTC] PHP Deprecated:  Required parameter $ReferenceId follows optional parameter $SalemanId in /home/alsymbwz/public_html/meesaq_honda/application/models/SaleReport_model.php on line 42
+[21-May-2025 18:52:03 UTC] PHP Deprecated:  Required parameter $ProductId follows optional parameter $SalemanId in /home/alsymbwz/public_html/meesaq_honda/application/models/SaleReport_model.php on line 42
+[21-May-2025 18:52:03 UTC] PHP Deprecated:  Required parameter $LocationId follows optional parameter $SalemanId in /home/alsymbwz/public_html/meesaq_honda/application/models/SaleReport_model.php on line 42
+[21-May-2025 18:52:03 UTC] PHP Deprecated:  Required parameter $SaleType follows optional parameter $SalemanId in /home/alsymbwz/public_html/meesaq_honda/application/models/SaleReport_model.php on line 42
+[21-May-2025 18:52:03 UTC] PHP Deprecated:  Required parameter $SaleMethod follows optional parameter $SalemanId in /home/alsymbwz/public_html/meesaq_honda/application/models/SaleReport_model.php on line 42
+[21-May-2025 18:52:03 UTC] PHP Deprecated:  Required parameter $ColourId follows optional parameter $SalemanId in /home/alsymbwz/public_html/meesaq_honda/application/models/SaleReport_model.php on line 42
+[21-May-2025 18:52:03 UTC] PHP Deprecated:  Required parameter $CategoryId follows optional parameter $SalemanId in /home/alsymbwz/public_html/meesaq_honda/application/models/SaleReport_model.php on line 42
+[21-May-2025 18:52:03 UTC] PHP Deprecated:  Required parameter $ProductGroupId follows optional parameter $SalemanId in /home/alsymbwz/public_html/meesaq_honda/application/models/SaleReport_model.php on line 42
+[21-May-2025 18:52:03 UTC] PHP Deprecated:  Required parameter $BrandId follows optional parameter $SalemanId in /home/alsymbwz/public_html/meesaq_honda/application/models/SaleReport_model.php on line 42
+[21-May-2025 18:52:03 UTC] PHP Deprecated:  Required parameter $StartDate follows optional parameter $SalemanId in /home/alsymbwz/public_html/meesaq_honda/application/models/SaleReport_model.php on line 42
+[21-May-2025 18:52:03 UTC] PHP Deprecated:  Required parameter $EndDate follows optional parameter $SalemanId in /home/alsymbwz/public_html/meesaq_honda/application/models/SaleReport_model.php on line 42
+[23-Jul-2025 20:05:05 UTC] PHP Fatal error:  Cannot redeclare Sales::AddSale() in /home/alsymbwz/public_html/hanif_packages/application/controllers/Sales.php on line 373
+[23-Jul-2025 20:05:14 UTC] PHP Fatal error:  Cannot redeclare Sales::AddSale() in /home/alsymbwz/public_html/hanif_packages/application/controllers/Sales.php on line 373
+[23-Jul-2025 20:05:16 UTC] PHP Fatal error:  Cannot redeclare Sales::AddSale() in /home/alsymbwz/public_html/hanif_packages/application/controllers/Sales.php on line 373
+[04-Aug-2025 20:30:21 UTC] PHP Fatal error:  Cannot redeclare AccountReports::ChartOfAccountReport() in /home/alsymbwz/public_html/hanif_packages/application/controllers/AccountReports.php on line 975
+[12-Aug-2025 15:10:27 UTC] PHP Fatal error:  Cannot redeclare Employee::EmployeeRoles() in /home/alsymbwz/public_html/hanif_packages/application/controllers/Employee.php on line 201

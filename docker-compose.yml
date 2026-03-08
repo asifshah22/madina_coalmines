@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+
+  php73:
+    build: .
+    container_name: madina_php73
+    ports:
+      - "8085:80"
+    volumes:
+      - ./:/var/www/html
+    command: bash -c "a2enmod rewrite && apache2-foreground"
+    depends_on:
+      - mysql
+
+  mysql:
+    image: mysql:5.7
+    container_name: madina_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: madina_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - dbdata:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: madina_phpmyadmin
+    restart: always
+    ports:
+      - "8086:80"
+    environment:
+      PMA_HOST: mysql
+      MYSQL_ROOT_PASSWORD: root
+
+volumes:
+  dbdata:

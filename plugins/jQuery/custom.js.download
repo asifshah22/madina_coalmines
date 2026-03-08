@@ -1,0 +1,188 @@
+function getDivisionOptionByProvinceNRegionsOption(province,region,tkn,ckie,ddlid,s_id){
+    var abc = tkn;
+    var def = $.cookie(ckie);
+    var hml = '<option value="">Select Division</option>';
+    s_id = (s_id == undefined) ? 0 : s_id
+    var dt = {"province" : province,"region" : region,csrf_test_name:def, value:def}
+    $.ajax({
+        type: "POST",
+        url: site_url+"/admin/globals/getDivisionByProvinceNRegion.html",
+        data : dt,
+        dataType : "JSON"
+     }).done(function( msg ) {
+        if(msg.status == true){
+            var data = msg.data
+            $(data).each(function(key,val){
+                var select ='';
+                if(s_id == val.ID){
+                    select = "selected='selected'"
+                }
+                hml += '<option value="'+val.ID+'" '+select+'>'+val.DIVISION+'</option>';
+            })
+            $('#'+ddlid).html(hml);
+        }
+    });
+}
+
+function getDistrictOptionByProvinceNRegionsNDivisionOption(province,region,division,tkn,ckie,ddlid,s_id){
+    var abc = tkn;
+    var def = $.cookie(ckie);
+    var hml = '<option value="">Select District</option>';
+    s_id = (s_id == undefined) ? 0 : s_id
+    var dt = {"province" : province,"region" : region,"division" : division,csrf_test_name:def, value:def}
+    $.ajax({
+        type: "POST",
+        url: site_url+"/admin/globals/getDistrictByProvinceNRegionNDivision.html",
+        data : dt,
+        dataType : "JSON"
+     }).done(function( msg ) {
+        if(msg.status == true){
+            var data = msg.data
+            $(data).each(function(key,val){
+                var select ='';
+                if(s_id == val.ID){
+                    select = "selected='selected'"
+                }
+                hml += '<option value="'+val.ID+'" '+select+'>'+val.DISTRICT+'</option>';
+            })
+            $('#'+ddlid).html(hml);
+        }
+    });
+}
+
+function getRegionsOptionByProvinceOption(province,tkn,ckie,ddlid,s_id){
+    var abc = tkn;
+    var def = $.cookie(ckie);
+    var hml = '<option value="">Select Region</option>';
+    s_id = (s_id == undefined) ? 0 : s_id
+    var dt = {"province" : province,csrf_test_name:def, value:def}
+    $.ajax({
+        type: "POST",
+        url: site_url+"/admin/globals/getRegionsByProvince.html",
+        data : dt,
+        dataType : "JSON"
+     }).done(function( msg ) {
+        if(msg.status == true){
+            var data = msg.data
+            $(data).each(function(key,val){
+                var select ='';
+                if(s_id == val.RegionId){
+                    select = "selected='selected'"
+                }
+                hml += '<option value="'+val.RegionId+'" '+select+'>'+val.Region+'</option>';
+            })
+            $('#'+ddlid).html(hml);
+        }
+    });
+}
+
+function getCitiesOptionByProvinceOption(province,tkn,ckie,ddlid,s_id){
+    var abc = tkn;
+    var def = $.cookie(ckie);
+    var hml = '<option value="">Select City</option>';
+    s_id = (s_id == undefined) ? 0 : s_id
+    var dt = {"province" : province,csrf_test_name:def, value:def}
+    $.ajax({
+        type: "POST",
+        url: site_url+"/admin/globals/getCitiesByProvince.html",
+        data : dt,
+        dataType : "JSON"
+     }).done(function( msg ) {
+        if(msg.status == true){
+            var data = msg.data
+            $(data).each(function(key,val){
+            	var select ='';
+            	if(s_id == val.ID){
+            		select = "selected='selected'"
+            	}
+                hml += '<option value="'+val.ID+'" '+select+'>'+val.City+'</option>';
+            })
+            $('#'+ddlid).html(hml);
+        }
+    });
+}
+
+function getPostCodeOptionBycities(data,ddlid,s_id){
+    s_id = (s_id == undefined) ? 0 : s_id
+    var dt = data
+    var hml = '<option value="">Select Post Code</option>';
+    $.ajax({
+        type: "POST",
+        url: site_url+"/admin/globals/getPostCodeOptionBycities.html",
+        data : dt,
+        dataType : "JSON"
+     }).done(function( msg ) {
+        if(msg.status == true){
+            var data = msg.data
+            $(data).each(function(key,val){
+            	var select ='';
+            	if(s_id == val.ID){
+            		select = "selected='selected'"
+            	}
+                hml += '<option value="'+val.ID+'" '+select+'>'+val.PostCode+'</option>';
+            })
+            $('#'+ddlid).html(hml);
+        }
+    });
+}
+
+function checkPostalCode(data){
+    var hml = '';
+    var dt = data
+    $.ajax({
+        type: "POST",
+        url: site_url+"/admin/globals/checkpostalcode.html",
+        data : dt,
+        dataType : "JSON"
+     }).done(function( msg ) {     	
+    });
+ }
+
+ function addCommas(inputText) {
+    // pattern works from right to left
+    var commaPattern = /(\d+)(\d{3})(\.\d*)*$/;
+    var callback = function (match, p1, p2, p3) {
+        return p1.replace(commaPattern, callback) + ',' + p2 + (p3 || '');
+    };
+    return inputText.replace(commaPattern, callback);
+}
+
+// events for demo
+$('.amt').live('blur',function(){
+    var amt = $(this).val()
+    $(this).val(addCommas(amt));
+});
+
+ function removeCommas(inputText) {
+    // pattern works from right to left
+    str =inputText.replace(",","");
+    return str;
+}
+
+//$('#applicant_issuance_register').live('change',function(){
+function appRegInfo(dt, def ){    
+    s_id = dt;
+    var result ;
+    var dt = {csrf_test_name:def, value:def};
+    $.ajax({
+        type: "POST",
+        url: site_url+"/admin/register/getApplicantIssueRegisterInfo/"+s_id+".html",
+        data : dt,
+        dataType : "JSON"
+     }).done(function( response ) {        
+        result =response;
+        if(result.status == true){
+            $('#cnic').val(result.dt.cnic)
+            $('#province').val(result.dt.provinceId)
+            $('#district').val(result.dt.district)
+            $('#name').val(result.dt.name)
+        }else{
+            $('#cnic').val('')
+            $('#province').val('')
+            $('#district').val('')
+            $('#name').val('')
+        }
+    });
+     return result;
+ }
+//});
