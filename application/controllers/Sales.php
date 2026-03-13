@@ -33,6 +33,86 @@ class Sales extends CI_Controller {
         { $this->session->set_userdata('url',  current_url()); redirect('Login'); }
 	}
 
+    private function normalizeImportHeader($value)
+    {
+        $value = strtolower(trim((string) $value));
+        $value = preg_replace('/\s+/', ' ', $value);
+        return $value;
+    }
+
+    private function normalizeNumericText($value)
+    {
+        return preg_replace('/\D+/', '', (string) $value);
+    }
+
+    private function parseImportFloat($value)
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return 0;
+        }
+        $value = str_replace(',', '', $value);
+        return (float) $value;
+    }
+
+    private function parseImportDate($value)
+    {
+        if ($value === null || $value === '') {
+            return date('Y-m-d H:i:s');
+        }
+
+        if (is_numeric($value)) {
+            $excelTime = PHPExcel_Shared_Date::ExcelToPHP((float) $value);
+            return date('Y-m-d H:i:s', $excelTime);
+        }
+
+        $time = strtotime((string) $value);
+        if ($time === false) {
+            return date('Y-m-d H:i:s');
+        }
+
+        return date('Y-m-d H:i:s', $time);
+    }
+
+    private function getMappedValue($row, $aliases)
+    {
+        foreach ($aliases as $alias) {
+            if (array_key_exists($alias, $row) && trim((string) $row[$alias]) !== '') {
+                return $row[$alias];
+            }
+        }
+        return '';
+    }
+
+    private function detectImportHeaderRow($sheet, $highestRow, $highestColumnIndex)
+    {
+        $bestRow = 1;
+        $bestScore = -1;
+
+        for ($row = 1; $row <= min(15, $highestRow); $row++) {
+            $nonEmpty = 0;
+            $score = 0;
+            for ($col = 0; $col < $highestColumnIndex; $col++) {
+                $value = $this->normalizeImportHeader($sheet->getCellByColumnAndRow($col, $row)->getValue());
+                if ($value === '') {
+                    continue;
+                }
+                $nonEmpty++;
+                if (strpos($value, 'cnic') !== false || strpos($value, 'invoice') !== false || strpos($value, 'ref') !== false) {
+                    $score++;
+                }
+            }
+
+            $score += $nonEmpty;
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestRow = $row;
+            }
+        }
+
+        return $bestRow;
+    }
+
 	public function AllCustomers()
 	{
 		$data['AllCustomers']=$this->Customer_model->GetAllCustomers();
@@ -1362,6 +1442,292 @@ document.addEventListener("click", function(event) {
 		
 		return $items;
 	}
+
+    public function DownloadSalesImportTemplate()
+    {
+        require_once APPPATH . 'libraries/PHPExcel.php';
+        if (!class_exists('ZipArchive')) {
+            PHPExcel_Settings::setZipClass(PHPExcel_Settings::PCLZIP);
+        }
+
+        $excel = new PHPExcel();
+        $excel->getProperties()
+            ->setCreator('AL-SYED SOFTWARE')
+            ->setTitle('Sales Import Template')
+            ->setDescription('Latest sales import template');
+
+        $sheet = $excel->setActiveSheetIndex(0);
+        $sheet->setTitle('Sales Import');
+
+        $headers = array(
+            'Scenario Type',
+            'Customer Name',
+            'Cus: CNIC',
+            'Reference No',
+            'Invoice Date',
+            'Product Id',
+            'Qty',
+            'Amount',
+            'GST Rate',
+            'GST',
+            'Discount',
+            'Net Amount',
+        );
+
+        $col = 0;
+        foreach ($headers as $header) {
+            $sheet->setCellValueByColumnAndRow($col, 1, $header);
+            $col++;
+        }
+
+        $rows = array(
+            array('SN006', 'ABC Store', '41301-1234567-1', 'INV-1001', '2026-03-09', 101, 10, 5000, 18, 900, -100, 5800),
+            array('SN006', 'ABC Store', '41301-1234567-1', 'INV-1001', '2026-03-09', 102, 5, 2500, 18, 450, -50, 2900),
+            array('SN006', 'XYZ Traders', '42101-9876543-9', 'INV-1002', '2026-03-09', 103, 20, 8000, 18, 1440, -200, 9240),
+        );
+
+        $rowNumber = 2;
+        foreach ($rows as $row) {
+            for ($i = 0; $i < count($row); $i++) {
+                $sheet->setCellValueByColumnAndRow($i, $rowNumber, $row[$i]);
+            }
+            $rowNumber++;
+        }
+
+        foreach (range('A', 'L') as $columnId) {
+            $sheet->getColumnDimension($columnId)->setAutoSize(true);
+        }
+
+        $filename = 'Sales_Import_Template_Latest.xlsx';
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        header('Cache-Control: max-age=1');
+        header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
+        header('Cache-Control: cache, must-revalidate');
+        header('Pragma: public');
+
+        $writer = PHPExcel_IOFactory::createWriter($excel, 'Excel2007');
+        $writer->save('php://output');
+        exit;
+    }
+
+    public function ImportSalesExcel()
+    {
+        if (empty($_FILES['import_excel']['name'])) {
+            $this->session->set_flashdata('fbr_error', 'Please select an Excel file first.');
+            redirect('Sales');
+            return;
+        }
+
+        $originalName = $_FILES['import_excel']['name'];
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        if (!in_array($extension, array('xlsx', 'xls'))) {
+            $this->session->set_flashdata('fbr_error', 'Only .xlsx or .xls files are allowed.');
+            redirect('Sales');
+            return;
+        }
+
+        $config['upload_path'] = './uploads/';
+        $config['allowed_types'] = '*';
+        $config['max_size'] = 10240;
+        $config['file_name'] = 'sale_import_' . time();
+        $config['overwrite'] = false;
+        $config['detect_mime'] = false;
+        $config['mod_mime_fix'] = false;
+
+        $this->load->library('upload', $config);
+        if (!$this->upload->do_upload('import_excel')) {
+            $this->session->set_flashdata('fbr_error', $this->upload->display_errors('', ''));
+            redirect('Sales');
+            return;
+        }
+
+        $uploadData = $this->upload->data();
+        $filePath = $uploadData['full_path'];
+
+        require_once APPPATH . 'libraries/PHPExcel.php';
+        if (!class_exists('ZipArchive')) {
+            PHPExcel_Settings::setZipClass(PHPExcel_Settings::PCLZIP);
+        }
+        try {
+            $readerType = ($extension === 'xlsx') ? 'Excel2007' : 'Excel5';
+            $reader = PHPExcel_IOFactory::createReader($readerType);
+            $reader->setReadDataOnly(true);
+            if (!$reader->canRead($filePath)) {
+                @unlink($filePath);
+                $this->session->set_flashdata('fbr_error', 'Invalid Excel file. Please use the latest template.');
+                redirect('Sales');
+                return;
+            }
+            $excel = $reader->load($filePath);
+        } catch (Exception $e) {
+            @unlink($filePath);
+            $this->session->set_flashdata('fbr_error', 'Unable to read Excel file.');
+            redirect('Sales');
+            return;
+        }
+
+        if ((int) $excel->getSheetCount() < 1) {
+            @unlink($filePath);
+            $this->session->set_flashdata('fbr_error', 'Excel file has no worksheet. Please download and use the latest template again.');
+            redirect('Sales');
+            return;
+        }
+
+        $sheet = $excel->getSheet(0);
+        $highestRow = (int) $sheet->getHighestRow();
+        $highestColumnIndex = PHPExcel_Cell::columnIndexFromString($sheet->getHighestColumn());
+        $headerRowNumber = $this->detectImportHeaderRow($sheet, $highestRow, $highestColumnIndex);
+
+        $headers = array();
+        for ($col = 0; $col < $highestColumnIndex; $col++) {
+            $headerText = $sheet->getCellByColumnAndRow($col, $headerRowNumber)->getValue();
+            $headers[$col] = $this->normalizeImportHeader($headerText);
+        }
+
+        $invoiceGroups = array();
+        $skippedRows = 0;
+
+        for ($row = $headerRowNumber + 1; $row <= $highestRow; $row++) {
+            $rowAssoc = array();
+            $hasAnyValue = false;
+            for ($col = 0; $col < $highestColumnIndex; $col++) {
+                $cell = $sheet->getCellByColumnAndRow($col, $row);
+                $value = $cell->getValue();
+                if ($cell->getDataType() === PHPExcel_Cell_DataType::TYPE_FORMULA) {
+                    $value = $cell->getCalculatedValue();
+                }
+                if ($value instanceof PHPExcel_RichText) {
+                    $value = $value->getPlainText();
+                }
+                $value = trim((string) $value);
+                if ($value !== '') {
+                    $hasAnyValue = true;
+                }
+                $rowAssoc[$headers[$col]] = $value;
+            }
+
+            if (!$hasAnyValue) {
+                continue;
+            }
+
+            $scenarioType = $this->getMappedValue($rowAssoc, array('senario type', 'scenario type'));
+            $customerName = $this->getMappedValue($rowAssoc, array('customer name', 'customer', 'cus name', 'cus: name'));
+            $customerNic = $this->getMappedValue($rowAssoc, array('cus: cnic', 'customer nic', 'cnic', 'nic'));
+            $invoiceNo = $this->getMappedValue($rowAssoc, array('ref: no.', 'invoice no', 'invoice #', 'reference no', 'ref no', 'dc no'));
+            $saleDateCell = $this->getMappedValue($rowAssoc, array('invoice date', 'sale date', 'date'));
+            $qty = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('sale qty - kgs', 'sale qty -  kgs', 'sale qty', 'qty', 'quantity')));
+            $gross = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('gross amount', 'amount', 'value sales excluding st')));
+            $gstRate = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('gst rate', 'tax percentage', 'tax rate', 'gst %', 'gst%')));
+            $gst = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('gst', 'tax')));
+            $discount = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('discount', 'discounts', 'addl discount')));
+            $net = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('net amount incl gst', 'net amount', 'net')));
+            $productId = $this->getMappedValue($rowAssoc, array('product id'));
+            $productBarcode = $this->getMappedValue($rowAssoc, array('product barcode', 'barcode', 'product code', 'item code'));
+            $productName = $this->getMappedValue($rowAssoc, array('product name', 'item name'));
+
+            if ($net == 0 && ($gross != 0 || $gst != 0 || $discount != 0)) {
+                $net = ($gross + $gst + $discount);
+            }
+            if ($gstRate == 0 && $gross > 0 && $gst > 0) {
+                $gstRate = ($gst / $gross) * 100;
+            }
+
+            // Rate is always auto-calculated from Amount / Qty for import rows.
+            $rate = ($qty > 0) ? ($gross / $qty) : 0;
+
+            if ($invoiceNo === '') {
+                $invoiceNo = 'AUTO-' . $row;
+            }
+
+            if ($customerNic === '') {
+                $skippedRows++;
+                continue;
+            }
+
+            $normalizedInvoiceNo = trim((string) $invoiceNo);
+            $groupKey = strtolower($normalizedInvoiceNo);
+            if (!isset($invoiceGroups[$groupKey])) {
+                $invoiceGroups[$groupKey] = array(
+                    'header' => array(
+                        'scenario_type' => $scenarioType,
+                        'customer_name' => $customerName,
+                        'customer_nic' => $customerNic,
+                        'invoice_no' => $normalizedInvoiceNo,
+                        'sale_date' => $this->parseImportDate($saleDateCell),
+                    ),
+                    'items' => array(),
+                );
+            } else {
+                // Keep group header usable even if first row had empty/mismatched NIC/name
+                if (empty($invoiceGroups[$groupKey]['header']['customer_nic']) && !empty($customerNic)) {
+                    $invoiceGroups[$groupKey]['header']['customer_nic'] = $customerNic;
+                }
+                if (empty($invoiceGroups[$groupKey]['header']['customer_name']) && !empty($customerName)) {
+                    $invoiceGroups[$groupKey]['header']['customer_name'] = $customerName;
+                }
+            }
+
+            $invoiceGroups[$groupKey]['items'][] = array(
+                'quantity' => $qty,
+                'rate' => $rate,
+                'gst_rate' => $gstRate,
+                'gross_amount' => $gross,
+                'gst_amount' => $gst,
+                'discount_amount' => $discount,
+                'net_amount' => $net,
+                'product_id' => $productId,
+                'product_barcode' => $productBarcode,
+                'product_name' => $productName,
+            );
+        }
+
+        $createdInvoices = 0;
+        $notFoundCustomers = array();
+
+        foreach ($invoiceGroups as $group) {
+            $customer = $this->Sale_model->GetCustomerByNIC($group['header']['customer_nic']);
+            if (empty($customer) && !empty($group['header']['customer_name'])) {
+                $customerByName = $this->Customer_model->GetCustomerByName(trim((string) $group['header']['customer_name']));
+                if (!empty($customerByName)) {
+                    $customer = array(
+                        'CustomerId' => $customerByName->CustomerId,
+                        'CustomerName' => $customerByName->CustomerName,
+                    );
+                }
+            }
+            if (empty($customer)) {
+                $notFoundCustomers[] = $group['header']['customer_nic'];
+                continue;
+            }
+
+            $group['header']['customer_id'] = $customer['CustomerId'];
+            if (empty($group['header']['customer_name'])) {
+                $group['header']['customer_name'] = $customer['CustomerName'];
+            }
+
+            $saleId = $this->Sale_model->SaveImportedSale($group['header'], $group['items']);
+            if ($saleId) {
+                $createdInvoices++;
+            }
+        }
+
+        @unlink($filePath);
+
+        $message = 'Excel import processed. Imported invoices: ' . $createdInvoices . '.';
+        if ($skippedRows > 0) {
+            $message .= ' Skipped rows without NIC: ' . $skippedRows . '.';
+        }
+        if (!empty($notFoundCustomers)) {
+            $message .= ' Customer NIC not found (skipped): ' . implode(', ', array_unique($notFoundCustomers)) . '.';
+        }
+        $this->session->set_flashdata('fbr_success', $message);
+
+        redirect('Sales');
+    }
 	
 	public function DeleteSales($SaleId)
 	{

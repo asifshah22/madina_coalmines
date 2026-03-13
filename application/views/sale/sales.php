@@ -60,7 +60,20 @@
                     
                   <?php // if ($SalesRoles[0]['AddRoles'] == 1) {
                     ?>
-                  <div class="col-sm-2"><a href="<?= base_url(); ?>Sales/AddSale" class="btn btn-primary">Add Record</a></div>
+                  <div class="row" style="margin-top:10px;">
+                    <div class="col-sm-2" style="margin-bottom:10px;">
+                      <a href="<?= base_url(); ?>Sales/AddSale" class="btn btn-primary">Add Record</a>
+                    </div>
+                    <div class="col-sm-10">
+                      <form action="<?= base_url(); ?>Sales/ImportSalesExcel" method="post" enctype="multipart/form-data" class="form-inline">
+                        <div class="form-group" style="margin-right:8px;">
+                          <input type="file" name="import_excel" class="form-control" accept=".xlsx,.xls" required>
+                        </div>
+                        <button type="submit" class="btn btn-success">Import Excel</button>
+                        <a href="<?= base_url(); ?>Sales/DownloadSalesImportTemplate" class="btn btn-info" style="margin-left:6px;">Download Latest Template</a>
+                      </form>
+                    </div>
+                  </div>
                     <?php
 //                  } ?>
                 </div><!-- /.span -->

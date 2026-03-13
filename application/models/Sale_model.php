@@ -1,6 +1,8 @@
 <?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
 class Sale_model extends CI_Model{
+
+    private $importTableFieldsCache = array();
 	
 	function __construct()
 	{
@@ -186,10 +188,12 @@ class Sale_model extends CI_Model{
 	
 	function GetSalesDetail($SaleId)
 	{
-	    $this->db->select('*,pos_sales_detail.ProductBarCode');
+	    $this->db->select("pos_sales_detail.*, pos_sales.SaleDate, pos_sales.SaleId,
+            COALESCE(NULLIF(pos_products.ProductName,''), NULLIF(pos_sales_detail.Comments,''), 'Imported Item') AS ProductName,
+            pos_sales_detail.ProductBarCode, pos_locations.LocationName, pos_product_colours.ColourName");
 	    $this->db->from($this->tbl_sales);  
-	    $this->db->join($this->tbl_sales_detail, $this->tbl_sales_detail.'.SaleId = '.$this->tbl_sales.'.SaleId');
-	    $this->db->join($this->tbl_products, $this->tbl_products.'.ProductId = '.$this->tbl_sales_detail.'.ProductId');
+	    $this->db->join($this->tbl_sales_detail, $this->tbl_sales_detail.'.SaleId = '.$this->tbl_sales.'.SaleId', 'left');
+	    $this->db->join($this->tbl_products, $this->tbl_products.'.ProductId = '.$this->tbl_sales_detail.'.ProductId', 'left');
 	    $this->db->join($this->tbl_locations, $this->tbl_locations.'.LocationId = '.$this->tbl_sales_detail.'.LocationId','left');
 	    $this->db->join($this->tbl_product_colours, $this->tbl_product_colours.'.ColourId = '.$this->tbl_sales_detail.'.ColourId','left');
 	    $this->db->where('pos_sales_detail.SaleId',$SaleId);
@@ -1148,7 +1152,7 @@ $SalemanChartOfAccountId = isset($IdArrSaleman[1]) ? $IdArrSaleman[1] : null;
 	    $query = $this->db->get();
 	    return $query->row();	
 	}
-    function GetInvoiceSales($SaleId)
+	function GetInvoiceSales($SaleId)
 	{
 		$this->db->select('TotalAmount');
 		$this->db->from($this->tbl_sales);
@@ -1156,6 +1160,276 @@ $SalemanChartOfAccountId = isset($IdArrSaleman[1]) ? $IdArrSaleman[1] : null;
 		$query = $this->db->get();
 		return $query->result_array();
 	}
+
+    private function importFilterTableData($table, $data)
+    {
+        if (!isset($this->importTableFieldsCache[$table])) {
+            $this->importTableFieldsCache[$table] = $this->db->list_fields($table);
+        }
+
+        $allowed = array_flip($this->importTableFieldsCache[$table]);
+        $filtered = array();
+
+        foreach ($data as $key => $value) {
+            if (isset($allowed[$key])) {
+                $filtered[$key] = $value;
+            }
+        }
+
+        return $filtered;
+    }
+
+    public function GetCustomerByNIC($nic)
+    {
+        $normalized = preg_replace('/\D+/', '', (string) $nic);
+        if ($normalized === '') {
+            return null;
+        }
+
+        $sql = "SELECT * FROM {$this->tbl_customer}
+                WHERE REPLACE(REPLACE(REPLACE(ContactName, '-', ''), ' ', ''), '.', '') = ?
+                   OR REPLACE(REPLACE(REPLACE(CellNo, '-', ''), ' ', ''), '.', '') = ?
+                   OR REPLACE(REPLACE(REPLACE(PhoneNo, '-', ''), ' ', ''), '.', '') = ?
+                LIMIT 1";
+
+        $query = $this->db->query($sql, array($normalized, $normalized, $normalized));
+        return $query->row_array();
+    }
+
+    public function GetProductByImportRow($item)
+    {
+        if (!empty($item['product_id']) && is_numeric($item['product_id'])) {
+            $product = $this->db->get_where('pos_products', array('ProductId' => (int) $item['product_id']))->row_array();
+            if (!empty($product)) {
+                return $product;
+            }
+        }
+
+        if (!empty($item['product_barcode'])) {
+            $product = $this->db->get_where('pos_products', array('ProductBarCode' => trim((string) $item['product_barcode'])))->row_array();
+            if (!empty($product)) {
+                return $product;
+            }
+        }
+
+        if (!empty($item['product_name'])) {
+            $this->db->from('pos_products');
+            $this->db->like('ProductName', trim((string) $item['product_name']));
+            $this->db->limit(1);
+            $query = $this->db->get();
+            return $query->row_array();
+        }
+
+        return null;
+    }
+
+    public function SaveImportedSale($header, $items)
+    {
+        if (empty($header) || empty($items)) {
+            return false;
+        }
+
+        $companyDateTime = date('Y-m-d H:i:s');
+        $companyDate = date('Y-m-d');
+        $employeeId = $this->session->userdata('EmployeeId');
+        $totalAmount = 0;
+
+        foreach ($items as $item) {
+            $totalAmount += (float) $item['net_amount'];
+        }
+
+        $sale = array(
+            'AccountId' => 0,
+            'CustomerId' => (int) $header['customer_id'],
+            'ReferenceId' => 0,
+            'SalemanId' => 0,
+            'Counter' => 0,
+            'SaleStatus' => 'Confirm',
+            'SaleType' => 2,
+            'SaleMethod' => 'Wholesale',
+            'SaleDate' => $header['sale_date'],
+            'SaleNo' => $header['invoice_no'],
+            'TotalAmount' => $totalAmount,
+            'SaleNote' => 'Imported from Excel - Invoice ' . $header['invoice_no'],
+            'WalkinCustomer' => '',
+            'MobileNumber' => '',
+            'TotalDiscount' => 0,
+            'PreviousBalance' => $totalAmount,
+            'VehicleNo' => !empty($header['invoice_no']) ? $header['invoice_no'] : '',
+            'Scenario_Type' => !empty($header['scenario_type']) ? $header['scenario_type'] : '',
+            'fbr_cnic' => $header['customer_nic'],
+            'fbr_customer' => !empty($header['customer_name']) ? $header['customer_name'] : '',
+            'AddedOn' => $companyDateTime,
+            'AddedBy' => $employeeId,
+        );
+
+        $sale = $this->importFilterTableData('pos_sales', $sale);
+
+        $this->db->trans_start();
+        $this->db->insert('pos_sales', $sale);
+        $saleId = (int) $this->db->insert_id();
+
+        foreach ($items as $item) {
+            $product = $this->GetProductByImportRow($item);
+            $productId = !empty($product['ProductId']) ? (int) $product['ProductId'] : 0;
+            $barcode = !empty($product['ProductBarCode']) ? $product['ProductBarCode'] : (string) $item['product_barcode'];
+            $quantity = (float) $item['quantity'];
+            $rate = (float) $item['rate'];
+            $amount = (float) $item['gross_amount'];
+            $gstRate = !empty($item['gst_rate']) ? (float) $item['gst_rate'] : 0;
+            $taxAmount = (float) $item['gst_amount'];
+            $discountAmount = (float) $item['discount_amount'];
+            $netAmount = (float) $item['net_amount'];
+            $taxPercentage = $gstRate > 0 ? $gstRate : (($amount > 0) ? (($taxAmount / $amount) * 100) : 0);
+
+            $saleDetail = array(
+                'SaleId' => $saleId,
+                'CustomerId' => (int) $header['customer_id'],
+                'LocationId' => 1,
+                'ColourId' => 0,
+                'ProductId' => $productId,
+                'ProductBarCode' => $barcode,
+                'Quantity' => $quantity,
+                'Rate' => $rate,
+                'DiscountAmount' => $gstRate,//$discountAmount,
+                'Amount' => $amount,
+                'TaxPercentage' => $taxAmount,//$taxPercentage,
+                'TaxAmount' => $discountAmount,//$taxAmount,
+                'NetAmount' => $netAmount,
+                'SaleInvoice' => $header['invoice_no'],
+                'Comments' => !empty($item['product_name']) ? $item['product_name'] : 'Imported Item',
+            );
+
+            $saleDetail = $this->importFilterTableData('pos_sales_detail', $saleDetail);
+            $this->db->insert('pos_sales_detail', $saleDetail);
+
+            if ($productId > 0 && $quantity > 0) {
+                $stockDetail = array(
+                    'CustomerId' => (int) $header['customer_id'],
+                    'SaleId' => $saleId,
+                    'ProductId' => $productId,
+                    'LocationId' => 0,
+                    'ColourId' => 0,
+                    'Rate' => $rate,
+                    'Quantity' => $quantity,
+                    'DiscountAmount' => $discountAmount,
+                    'Amount' => $amount,
+                    'NetAmount' => $netAmount,
+                    'StockType' => 3,
+                    'InOutDate' => !empty($header['sale_date']) ? date('Y-m-d', strtotime($header['sale_date'])) : $companyDate,
+                    'Comments' => 'Imported from Excel',
+                    'AddedBy' => $employeeId,
+                    'AddedOn' => $companyDateTime,
+                );
+
+                $stockDetail = $this->importFilterTableData('pos_stocks_detail', $stockDetail);
+                $this->db->insert('pos_stocks_detail', $stockDetail);
+            }
+        }
+
+        // Create accounting voucher entries for imported sale as On Credit sale
+        $saleDateOnly = !empty($header['sale_date']) ? date('Y-m-d', strtotime($header['sale_date'])) : $companyDate;
+        $customerChartOfAccountId = 0;
+        $customerRow = $this->db->get_where($this->tbl_customer, array('CustomerId' => (int) $header['customer_id']))->row_array();
+        if (!empty($customerRow) && !empty($customerRow['ChartOfAccountId'])) {
+            $customerChartOfAccountId = (int) $customerRow['ChartOfAccountId'];
+        }
+
+        // Sale income account
+        $saleAccountChartOfAccountId = 0;
+        $saleAccount = $this->db
+            ->select('ChartOfAccountId')
+            ->from('pos_accounts_chartofaccount')
+            ->where('ChartOfAccountCategoryId', 3)
+            ->where('ChartOfAccountControlId', 6)
+            ->get()
+            ->row_array();
+        if (!empty($saleAccount['ChartOfAccountId'])) {
+            $saleAccountChartOfAccountId = (int) $saleAccount['ChartOfAccountId'];
+        }
+
+        $journal = array(
+            'SaleId' => $saleId,
+            'EntryType' => 1,
+            'VoucherType' => 5, // JV for credit sale
+            'Reference' => $this->JVReferenceNo(),
+            'TransactionDate' => $saleDateOnly,
+            'TotalDebit' => $totalAmount,
+            'TotalCredit' => $totalAmount,
+            'CustomerId' => (int) $header['customer_id'],
+            'AddedOn' => $companyDateTime,
+            'AddedBy' => $employeeId,
+        );
+        $journal = $this->importFilterTableData('pos_accounts_generaljournal', $journal);
+        $this->db->insert('pos_accounts_generaljournal', $journal);
+        $generalJournalId = (int) $this->db->insert_id();
+
+        if ($generalJournalId > 0) {
+            foreach ($items as $item) {
+                $itemQty = (float) $item['quantity'];
+                $itemRate = (float) $item['rate'];
+                $itemNet = (float) $item['net_amount'];
+                $itemTax = (float) $item['gst_amount'];
+                $itemDetail = 'Imported item qty: ' . $itemQty . ' rate: ' . $itemRate;
+
+                // GST impact
+                if ($itemTax > 0) {
+                    $gstDebit = array(
+                        'GeneralJournalId' => $generalJournalId,
+                        'ChartOfAccountId' => 3,
+                        'Debit' => $itemTax,
+                        'Credit' => 0,
+                        'Detail' => 'GST Amount',
+                    );
+                    $gstDebit = $this->importFilterTableData('pos_accounts_generaljournal_entries', $gstDebit);
+                    $this->db->insert('pos_accounts_generaljournal_entries', $gstDebit);
+
+                    $gstCredit = array(
+                        'GeneralJournalId' => $generalJournalId,
+                        'ChartOfAccountId' => 1125,
+                        'Debit' => 0,
+                        'Credit' => $itemTax,
+                        'Detail' => 'GST Amount',
+                    );
+                    $gstCredit = $this->importFilterTableData('pos_accounts_generaljournal_entries', $gstCredit);
+                    $this->db->insert('pos_accounts_generaljournal_entries', $gstCredit);
+                }
+
+                if ($customerChartOfAccountId > 0 && $itemNet > 0) {
+                    $debitEntry = array(
+                        'GeneralJournalId' => $generalJournalId,
+                        'CustomerId' => (int) $header['customer_id'],
+                        'ChartOfAccountId' => $customerChartOfAccountId,
+                        'Debit' => $itemNet,
+                        'Credit' => 0,
+                        'Detail' => $itemDetail,
+                    );
+                    $debitEntry = $this->importFilterTableData('pos_accounts_generaljournal_entries', $debitEntry);
+                    $this->db->insert('pos_accounts_generaljournal_entries', $debitEntry);
+                }
+
+                if ($saleAccountChartOfAccountId > 0 && $itemNet > 0) {
+                    $creditEntry = array(
+                        'GeneralJournalId' => $generalJournalId,
+                        'CustomerId' => (int) $header['customer_id'],
+                        'ChartOfAccountId' => $saleAccountChartOfAccountId,
+                        'Debit' => 0,
+                        'Credit' => $itemNet,
+                        'Detail' => $itemDetail,
+                    );
+                    $creditEntry = $this->importFilterTableData('pos_accounts_generaljournal_entries', $creditEntry);
+                    $this->db->insert('pos_accounts_generaljournal_entries', $creditEntry);
+                }
+            }
+        }
+
+        $this->db->trans_complete();
+        if (!$this->db->trans_status()) {
+            return false;
+        }
+
+        return $saleId;
+    }
 
 }
 ?>
