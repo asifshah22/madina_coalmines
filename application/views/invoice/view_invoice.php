@@ -77,6 +77,7 @@ $this->load->view('includes/sidebar');
 		$TotalDiscount = 0;
 		$TotalGSTAmount = 0;
 		$TotalFEDAmount = 0;
+		$TotalFurtherTaxAmount = 0;
 		$TotalNetAmount = 0;
 	      ?>
 	      <div class="row">
@@ -94,8 +95,10 @@ $this->load->view('includes/sidebar');
 		       <th style="padding:5px;">Weight (KG)</th>
 		       <th style="padding:5px;">Rate / KG</th>
 		       <th style="padding:5px;">Amount</th>
-		        <th style="padding:5px;">GST %</th>
+		       <th style="padding:5px;">GST %</th>
 		       <th style="padding:5px;">GST Amount</th>
+		       <th style="padding:5px;">F.Tax %</th>
+		       <th style="padding:5px;">F.Tax Amt</th>
 		       <th style="padding:5px;">FED %</th>
 		       <th style="padding:5px;">FED Amount</th>
 		       <th style="padding:5px;">Net Amount</th>
@@ -169,6 +172,8 @@ $this->load->view('includes/sidebar');
 		    <!-- <td style='padding:5px; width:7%;'><input type="number" min="0" style="width:100%; text-align:right;" name="DiscountAmount[]" class="DiscountAmount" id="DiscountAmount_<?php echo $SNo; ?>" value="" autocomplete="off"></td> -->
 		    <td style='padding:5px; width:7%; text-align:right;'><?php echo $Record["GST"]; ?></td>
 		    <td style='padding:5px; width:7%; text-align:right;'><?php echo number_format($Record["GSTAmount"],2); ?></td>
+		    <td style='padding:5px; width:7%; text-align:right;'><?php echo isset($Record["FurtherTaxRate"]) ? $Record["FurtherTaxRate"] : 0; ?></td>
+		    <td style='padding:5px; width:7%; text-align:right;'><?php echo number_format(isset($Record["FurtherTaxAmt"]) ? $Record["FurtherTaxAmt"] : 0,2); ?></td>
 		    <td style='padding:5px; width:7%; text-align:right;'><?php echo $Record["FED"]; ?></td>
 		    <td style='padding:5px; width:7%; text-align:right;'><?php echo number_format($Record["FEDAmount"],2); ?></td>
 		    <td style='padding:5px; width:7%; text-align:right;'><?php echo number_format($Record["NetAmount"],2); ?></td>
@@ -177,6 +182,7 @@ $this->load->view('includes/sidebar');
 		     $TotalWeight += $Record["Weight"];
 		     $TotalAmount += $Record["Amount"]; 
 		     $TotalGSTAmount += $Record["GSTAmount"];
+		     $TotalFurtherTaxAmount += isset($Record["FurtherTaxAmt"]) ? $Record["FurtherTaxAmt"] : 0;
 		     $TotalFEDAmount += $Record["FEDAmount"];
 		     $TotalNetAmount += $Record["NetAmount"];
 		    
@@ -185,16 +191,20 @@ $this->load->view('includes/sidebar');
 		    <tr>
 		    <td colspan="5" style="text-align:right; font-weight:600;">Total Weight:</td>
 		    <td style="text-align:right; font-weight:600;"><?php echo number_format($TotalWeight,0); ?></td>
-		    <td colspan="6" style="text-align:right; font-weight:600;">Total Amount:</td>
+		    <td colspan="8" style="text-align:right; font-weight:600;">Total Amount:</td>
 		    <td style="text-align:right; color:#3333CC; font-weight:600;"><?php echo number_format($TotalAmount,2); ?></td>
 		    </tr>
 		    <tr>
-		    <td colspan="12" style="text-align:right; font-weight:600;">Total GST Amount:</td>
+		    <td colspan="14" style="text-align:right; font-weight:600;">Total GST Amount:</td>
 		    <td style="text-align:right; font-weight:600;"><?php echo number_format($TotalGSTAmount,2); ?></td>
 		    
 		    </tr>
 		    <tr>
-		    <td colspan="12" style="text-align:right; font-weight:600;">Total FED Amount:</td>
+		    <td colspan="14" style="text-align:right; font-weight:600;">Total Further Tax Amount:</td>
+		    <td style="text-align:right; font-weight:600;"><?php echo number_format($TotalFurtherTaxAmount,2); ?></td>
+		    </tr>
+		    <tr>
+		    <td colspan="14" style="text-align:right; font-weight:600;">Total FED Amount:</td>
 		    <td style="text-align:right; font-weight:600;"><?php echo number_format($TotalFEDAmount,2); ?></td>
 		    </tr>
 		    <!-- <tr>
@@ -203,7 +213,7 @@ $this->load->view('includes/sidebar');
 		    <td></td>
 		    </tr>
 		    <tr> -->
-		     <td colspan="12" style="text-align:right; font-weight:600;">Total Net Amount:</td>
+		     <td colspan="14" style="text-align:right; font-weight:600;">Total Net Amount:</td>
 		     <td style="font-weight:600; color:#008000; text-align:right;"><?php echo number_format($TotalNetAmount,2); ?></td>
 		   
 		    </tr>

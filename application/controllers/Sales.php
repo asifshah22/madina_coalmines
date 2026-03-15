@@ -1470,6 +1470,8 @@ document.addEventListener("click", function(event) {
             'Amount',
             'GST Rate',
             'GST',
+            'F.Tax %',
+            'F.Tax Amt',
             'Discount',
             'Net Amount',
         );
@@ -1481,9 +1483,9 @@ document.addEventListener("click", function(event) {
         }
 
         $rows = array(
-            array('SN006', 'ABC Store', '41301-1234567-1', 'INV-1001', '2026-03-09', 101, 10, 5000, 18, 900, -100, 5800),
-            array('SN006', 'ABC Store', '41301-1234567-1', 'INV-1001', '2026-03-09', 102, 5, 2500, 18, 450, -50, 2900),
-            array('SN006', 'XYZ Traders', '42101-9876543-9', 'INV-1002', '2026-03-09', 103, 20, 8000, 18, 1440, -200, 9240),
+            array('SN006', 'ABC Store', '41301-1234567-1', 'INV-1001', '2026-03-09', 101, 10, 5000, 18, 900, 4, 200, -100, 6000),
+            array('SN006', 'ABC Store', '41301-1234567-1', 'INV-1001', '2026-03-09', 102, 5, 2500, 18, 450, 4, 100, -50, 3000),
+            array('SN006', 'XYZ Traders', '42101-9876543-9', 'INV-1002', '2026-03-09', 103, 20, 8000, 18, 1440, 4, 320, -200, 9560),
         );
 
         $rowNumber = 2;
@@ -1494,7 +1496,7 @@ document.addEventListener("click", function(event) {
             $rowNumber++;
         }
 
-        foreach (range('A', 'L') as $columnId) {
+        foreach (range('A', 'N') as $columnId) {
             $sheet->getColumnDimension($columnId)->setAutoSize(true);
         }
 
@@ -1623,17 +1625,22 @@ document.addEventListener("click", function(event) {
             $gross = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('gross amount', 'amount', 'value sales excluding st')));
             $gstRate = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('gst rate', 'tax percentage', 'tax rate', 'gst %', 'gst%')));
             $gst = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('gst', 'tax')));
+            $furtherTaxRate = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('f.tax %', 'f tax %', 'f.tax rate', 'f tax rate', 'further tax %', 'further tax rate')));
+            $furtherTaxAmount = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('f.tax amt', 'f tax amt', 'f.tax amount', 'f tax amount', 'further tax amt', 'further tax amount')));
             $discount = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('discount', 'discounts', 'addl discount')));
             $net = $this->parseImportFloat($this->getMappedValue($rowAssoc, array('net amount incl gst', 'net amount', 'net')));
             $productId = $this->getMappedValue($rowAssoc, array('product id'));
             $productBarcode = $this->getMappedValue($rowAssoc, array('product barcode', 'barcode', 'product code', 'item code'));
             $productName = $this->getMappedValue($rowAssoc, array('product name', 'item name'));
 
-            if ($net == 0 && ($gross != 0 || $gst != 0 || $discount != 0)) {
-                $net = ($gross + $gst + $discount);
+            if ($net == 0 && ($gross != 0 || $gst != 0 || $furtherTaxAmount != 0 || $discount != 0)) {
+                $net = ($gross + $gst + $furtherTaxAmount + $discount);
             }
             if ($gstRate == 0 && $gross > 0 && $gst > 0) {
                 $gstRate = ($gst / $gross) * 100;
+            }
+            if ($furtherTaxRate == 0 && $gross > 0 && $furtherTaxAmount > 0) {
+                $furtherTaxRate = ($furtherTaxAmount / $gross) * 100;
             }
 
             // Rate is always auto-calculated from Amount / Qty for import rows.
@@ -1677,6 +1684,8 @@ document.addEventListener("click", function(event) {
                 'gst_rate' => $gstRate,
                 'gross_amount' => $gross,
                 'gst_amount' => $gst,
+                'further_tax_rate' => $furtherTaxRate,
+                'further_tax_amount' => $furtherTaxAmount,
                 'discount_amount' => $discount,
                 'net_amount' => $net,
                 'product_id' => $productId,

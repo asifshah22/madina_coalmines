@@ -69,6 +69,7 @@ header("Content-Disposition: attachment; filename = Invoice Voucher.xls");
 		$TotalDiscount = 0;
 		$TotalGSTAmount = 0;
 		$TotalFEDAmount = 0;
+		$TotalFurtherTaxAmount = 0;
 		$TotalNetAmount = 0;
 	      ?>
 	      <div class="row">
@@ -86,8 +87,10 @@ header("Content-Disposition: attachment; filename = Invoice Voucher.xls");
 		       <th style="padding:5px;">Weight in KG</th>
 		       <th style="padding:5px;">Rate / KG</th>
 		       <th style="padding:5px;">Amount</th>
-		        <th style="padding:5px;">GST %</th>
+		       <th style="padding:5px;">GST %</th>
 		       <th style="padding:5px;">GST Amount</th>
+		       <th style="padding:5px;">F.Tax %</th>
+		       <th style="padding:5px;">F.Tax Amt</th>
 		       <th style="padding:5px;">FED %</th>
 		       <th style="padding:5px;">FED Amount</th>
 		       <th style="padding:5px;">Net Amount</th>
@@ -122,6 +125,8 @@ header("Content-Disposition: attachment; filename = Invoice Voucher.xls");
 		    <td style="padding:5px; width:8%; text-align:right;"><?php echo $Record["Amount"]; ?></td>
 		    <td style='padding:5px; width:7%; text-align:right;'><?php echo $Record["GST"]; ?></td>
 		    <td style='padding:5px; width:7%; text-align:right;'><?php echo number_format($Record["GSTAmount"],2); ?></td>
+		    <td style='padding:5px; width:7%; text-align:right;'><?php echo isset($Record["FurtherTaxRate"]) ? $Record["FurtherTaxRate"] : 0; ?></td>
+		    <td style='padding:5px; width:7%; text-align:right;'><?php echo number_format(isset($Record["FurtherTaxAmt"]) ? $Record["FurtherTaxAmt"] : 0,2); ?></td>
 		    <td style='padding:5px; width:7%; text-align:right;'><?php echo $Record["FED"]; ?></td>
 		    <td style='padding:5px; width:7%; text-align:right;'><?php echo number_format($Record["FEDAmount"],2); ?></td>
 		    <td style='padding:5px; width:7%; text-align:right;'><?php echo number_format($Record["NetAmount"],2); ?></td>
@@ -130,6 +135,7 @@ header("Content-Disposition: attachment; filename = Invoice Voucher.xls");
 		     $TotalWeight += $Record["Weight"];
 		     $TotalAmount += $Record["Amount"]; 
 		     $TotalGSTAmount += $Record["GSTAmount"];
+		     $TotalFurtherTaxAmount += isset($Record["FurtherTaxAmt"]) ? $Record["FurtherTaxAmt"] : 0;
 		     $TotalFEDAmount += $Record["FEDAmount"];
 		     $TotalNetAmount += $Record["NetAmount"];
 		    
@@ -138,19 +144,23 @@ header("Content-Disposition: attachment; filename = Invoice Voucher.xls");
 		    <tr>
 		    <td colspan="5" style="text-align:right; font-weight:600;"></td>
 		    <td style="text-align:right; font-weight:600;"><?php echo number_format($TotalWeight,0); ?></td>
-		    <td colspan="6" style="text-align:right; font-weight:600;">Total Amount:</td>
+		    <td colspan="8" style="text-align:right; font-weight:600;">Total Amount:</td>
 		    <td style="text-align:right; color:#3333CC; font-weight:600;"><?php echo number_format($TotalAmount,2); ?></td>
 		    </tr>
 		    <tr>
-		    <td colspan="12" style="text-align:right; font-weight:600;">Total GST Amount:</td>
+		    <td colspan="14" style="text-align:right; font-weight:600;">Total GST Amount:</td>
 		    <td style="text-align:right; font-weight:600;"><?php echo number_format($TotalGSTAmount,2); ?></td>
 		    
 		    </tr>
 		    <tr>
-		    <td colspan="12" style="text-align:right; font-weight:600;">Total FED Amount:</td>
+		    <td colspan="14" style="text-align:right; font-weight:600;">Total Further Tax Amount:</td>
+		    <td style="text-align:right; font-weight:600;"><?php echo number_format($TotalFurtherTaxAmount,2); ?></td>
+		    </tr>
+		    <tr>
+		    <td colspan="14" style="text-align:right; font-weight:600;">Total FED Amount:</td>
 		    <td style="text-align:right; font-weight:600;"><?php echo number_format($TotalFEDAmount,2); ?></td>
 		    </tr>
-		     <td colspan="12" style="text-align:right; font-weight:600;">Total Net Amount:</td>
+		     <td colspan="14" style="text-align:right; font-weight:600;">Total Net Amount:</td>
 		     <td style="font-weight:600; color:#008000; text-align:right;"><?php echo number_format($TotalNetAmount,2); ?></td>
 		   
 		    </tr>
