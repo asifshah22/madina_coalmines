@@ -43,6 +43,9 @@
                     <table id="sale-grid"  class="table table-striped"  cellpadding="0" cellspacing="0" border="0" class="display" width="100%" >
                       <thead>
                         <tr>
+                          <th style="width:40px; text-align:center;">
+                            <input type="checkbox" id="select-all-sales">
+                          </th>
                           <th>Invoice No</th>
                          <th>Dc No</th>
                           <th>Sale Date</th>
@@ -60,20 +63,101 @@
                     
                   <?php // if ($SalesRoles[0]['AddRoles'] == 1) {
                     ?>
-                  <div class="row" style="margin-top:10px;">
-                    <div class="col-sm-2" style="margin-bottom:10px;">
-                      <a href="<?= base_url(); ?>Sales/AddSale" class="btn btn-primary">Add Record</a>
-                    </div>
-                    <div class="col-sm-10">
-                      <form action="<?= base_url(); ?>Sales/ImportSalesExcel" method="post" enctype="multipart/form-data" class="form-inline">
-                        <div class="form-group" style="margin-right:8px;">
-                          <input type="file" name="import_excel" class="form-control" accept=".xlsx,.xls" required>
-                        </div>
-                        <button type="submit" class="btn btn-success">Import Excel</button>
-                        <a href="<?= base_url(); ?>Sales/DownloadSalesImportTemplate" class="btn btn-info" style="margin-left:6px;">Download Latest Template</a>
-                      </form>
-                    </div>
-                  </div>
+<div class="row" style="margin-top:15px;">
+<div class="col-md-12">
+
+<div style="
+background: linear-gradient(135deg,#f8fbff,#eef5ff);
+border-radius:10px;
+padding:15px 18px;
+box-shadow:0 4px 12px rgba(0,0,0,0.08);
+border-left:5px solid #4e73df;
+">
+
+<div class="row align-items-center">
+
+<div class="col-sm-2" style="margin-bottom:10px;">
+<a href="<?= base_url(); ?>Sales/AddSale" 
+class="btn"
+style="
+background:linear-gradient(135deg,#4e73df,#224abe);
+color:white;
+border:none;
+border-radius:6px;
+padding:8px 16px;
+font-weight:600;
+box-shadow:0 3px 8px rgba(0,0,0,0.15);
+">
+<i class="fa fa-plus"></i> Add Record
+</a>
+</div>
+
+<div class="col-sm-10">
+
+<form action="<?= base_url(); ?>Sales/ImportSalesExcel" method="post" enctype="multipart/form-data" class="form-inline">
+
+<div class="form-group" style="margin-right:10px;">
+<input type="file" name="import_excel" class="form-control"
+style="
+border-radius:6px;
+border:1px solid #d1d9e6;
+padding:6px 10px;
+background:#fff;
+"
+accept=".xlsx,.xls" required>
+</div>
+
+<button type="submit"
+class="btn"
+style="
+background:linear-gradient(135deg,#e74a3b,#c0392b);
+color:white;
+border:none;
+border-radius:6px;
+padding:8px 16px;
+font-weight:600;
+box-shadow:0 3px 8px rgba(0,0,0,0.15);
+margin-right:6px;
+">
+<i class="fa fa-upload"></i> Import Excel
+</button>
+
+<a href="<?= base_url(); ?>Sales/DownloadSalesImportTemplate"
+class="btn"
+style="
+background:linear-gradient(135deg,#f6c23e,#dda20a);
+color:black;
+border:none;
+border-radius:6px;
+padding:8px 16px;
+font-weight:600;
+box-shadow:0 3px 8px rgba(0,0,0,0.15);
+margin-right:6px;
+">
+<i class="fa fa-download"></i> Download Latest Template
+</a>
+
+<a href="#"
+class="btn"
+style="
+background:linear-gradient(135deg,#6f42c1,#4b2e83);
+color:white;
+border:none;
+border-radius:6px;
+padding:8px 16px;
+font-weight:600;
+box-shadow:0 3px 8px rgba(0,0,0,0.15);
+">
+<i class="fa fa-database"></i> FBR POSTING
+</a>
+
+</form>
+
+</div>
+</div>
+</div>
+</div>
+</div>
                     <?php
 //                  } ?>
                 </div><!-- /.span -->
@@ -90,16 +174,38 @@
   <!-- /.content-wrapper -->
 <?php $this->load->view('includes/footer'); ?>
 
+<style>
+  .qbo-dropdown.is-open .qbo-dropdown-content {
+    display: block !important;
+  }
+</style>
+
   <script>
  $(function(){
+     var selectedSales = {};
+
+     function syncHeaderCheckbox() {
+         var $rows = $('.sale-row-checkbox');
+         var totalRows = $rows.length;
+         var selectedRows = $rows.filter(':checked').length;
+         $('#select-all-sales').prop('checked', totalRows > 0 && totalRows === selectedRows);
+     }
+
      var dataTable = $('#sale-grid').DataTable( {
             'aoColumnDefs': [{
             'bSortable': false,
-            'aTargets': [-1] /* 1st one, start by the right */
+            'aTargets': [0, -1]
             }],
-	    'order': [[ 0, "desc" ]],
+	    'order': [[ 1, "desc" ]],
             "processing": true,
             "serverSide": true,
+            "drawCallback": function() {
+                $('.sale-row-checkbox').each(function () {
+                    var saleId = $(this).val();
+                    $(this).prop('checked', !!selectedSales[saleId]);
+                });
+                syncHeaderCheckbox();
+            },
             "ajax":{
                 url :"<?php echo base_url('Sales/Ajax_GetAllSales')?>", // json datasource
                 type: "post",  // method  , by default get
@@ -111,5 +217,44 @@
                 }
             }
         } ); 
+
+        $(document).on('change', '#select-all-sales', function() {
+            var isChecked = $(this).is(':checked');
+            $('.sale-row-checkbox').each(function () {
+                var saleId = $(this).val();
+                $(this).prop('checked', isChecked);
+                if (isChecked) {
+                    selectedSales[saleId] = true;
+                } else {
+                    delete selectedSales[saleId];
+                }
+            });
+        });
+
+        $(document).on('change', '.sale-row-checkbox', function() {
+            var saleId = $(this).val();
+            if ($(this).is(':checked')) {
+                selectedSales[saleId] = true;
+            } else {
+                delete selectedSales[saleId];
+            }
+            syncHeaderCheckbox();
+        });
+
+        $(document).on('click', '.qbo-dropbtn', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var $dropdown = $(this).closest('.qbo-dropdown');
+            $('.qbo-dropdown').not($dropdown).removeClass('is-open');
+            $dropdown.toggleClass('is-open');
+        });
+
+        $(document).on('click', '.qbo-dropdown-content', function(e) {
+            e.stopPropagation();
+        });
+
+        $(document).on('click', function() {
+            $('.qbo-dropdown').removeClass('is-open');
+        });
  });   
 </script>

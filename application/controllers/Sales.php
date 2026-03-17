@@ -168,6 +168,7 @@ class Sales extends CI_Controller {
 
                 $nestedData=array(); 
 //                $nestedData[] = $row['SaleNo'];
+                $nestedData[] = '<div style="text-align:center;"><input type="checkbox" class="sale-row-checkbox" value="'.$row["SaleId"].'"></div>';
                 $nestedData[] = $row['SaleId'];
                 
                 $nestedData[] = $row['isQuatation'];
@@ -194,7 +195,7 @@ $nestedData[] = '<span style="color:#202124; font-weight:600; font-size:14px; li
 //                if ($SalesRoles[0]['ViewRoles'] == 1 && $SalesRoles[0]['UpdateRoles'] ==1 ) {
 $links = '
 <div class="qbo-dropdown">
-    <button class="qbo-dropbtn">
+    <button type="button" class="qbo-dropbtn">
         <span class="colorful-dots">
             <span style="color: #4CAF50;">•</span>
             <span style="color: #2196F3;">•</span>
@@ -1634,7 +1635,7 @@ document.addEventListener("click", function(event) {
             $productName = $this->getMappedValue($rowAssoc, array('product name', 'item name'));
 
             if ($net == 0 && ($gross != 0 || $gst != 0 || $furtherTaxAmount != 0 || $discount != 0)) {
-                $net = ($gross + $gst + $furtherTaxAmount + $discount);
+                $net = ($gross + $gst + $furtherTaxAmount - $discount);
             }
             if ($gstRate == 0 && $gross > 0 && $gst > 0) {
                 $gstRate = ($gst / $gross) * 100;
