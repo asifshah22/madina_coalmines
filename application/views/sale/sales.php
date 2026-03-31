@@ -138,6 +138,7 @@ margin-right:6px;
 </a>
 
 <a href="#"
+id="bulk-fbr-posting-btn"
 class="btn"
 style="
 background:linear-gradient(135deg,#6f42c1,#4b2e83);
@@ -151,6 +152,10 @@ box-shadow:0 3px 8px rgba(0,0,0,0.15);
 <i class="fa fa-database"></i> FBR POSTING
 </a>
 
+</form>
+
+<form id="bulk-fbr-posting-form" action="<?= base_url(); ?>Sales/BulkFBR" method="post" style="display:none;">
+  <input type="hidden" name="selected_sale_ids" id="bulk-fbr-selected-sale-ids" value="">
 </form>
 
 </div>
@@ -255,6 +260,18 @@ box-shadow:0 3px 8px rgba(0,0,0,0.15);
 
         $(document).on('click', function() {
             $('.qbo-dropdown').removeClass('is-open');
+        });
+
+        $('#bulk-fbr-posting-btn').on('click', function(e) {
+            e.preventDefault();
+            var selectedIds = Object.keys(selectedSales);
+            if (selectedIds.length === 0) {
+                alert('Please select at least one sale for FBR posting.');
+                return;
+            }
+
+            $('#bulk-fbr-selected-sale-ids').val(selectedIds.join(','));
+            $('#bulk-fbr-posting-form').submit();
         });
  });   
 </script>

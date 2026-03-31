@@ -1214,15 +1214,22 @@ document.addEventListener("click", function(event) {
 // 	}
 
     
-	public function  FBR($SaleId)
+    private function submitSaleToFbr($SaleId)
 	{
         date_default_timezone_set('Asia/Karachi');
 		$data['Sales'] = $this->Sale_model->GetFbrSales($SaleId);
 		$data['SalesDetail'] = $this->Sale_model->GetFbrSalesDetail($SaleId);
 		$data['GetSetting']=$this->Setting_model->GetSetting($SettingId=1);
 
-		$scenarioId = $data['Sales']->Scenario_Type;
+        if (empty($data['Sales']) || empty($data['SalesDetail'])) {
+            return array('success' => false, 'message' => 'Sale #' . $SaleId . ' not found.');
+        }
 
+        if (!empty($data['Sales']->FbrNo)) {
+            return array('success' => false, 'message' => 'Sale #' . $SaleId . ' already posted to FBR.');
+        }
+
+		$scenarioId = $data['Sales']->Scenario_Type;
 		$items = $this->buildFbrItems($data['SalesDetail'], $scenarioId);
 		
 		$postData = array(
@@ -1242,14 +1249,12 @@ document.addEventListener("click", function(event) {
           "scenarioId" => $scenarioId,
           "items" => $items
         );
-        // echo '<pre>'; print_r($postData); echo '</pre>'; exit;
-		// Encode the data to JSON format
-		$jsonData = json_encode($postData);
 
+		$jsonData = json_encode($postData);
 		$curl = curl_init();
 
 		curl_setopt_array($curl, array(
-			CURLOPT_URL => 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb',//'https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData',
+			CURLOPT_URL => 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb',
 			CURLOPT_RETURNTRANSFER => true,
 			CURLOPT_ENCODING => '',
 			CURLOPT_MAXREDIRS => 10,
@@ -1265,49 +1270,103 @@ document.addEventListener("click", function(event) {
 				'Content-Type: application/json'
 			),
 		));
+
 		$responseRaw = curl_exec($curl);
+        if (curl_errno($curl)) {
+            $curlError = curl_error($curl);
+            curl_close($curl);
+            return array('success' => false, 'message' => 'Sale #' . $SaleId . ': ' . $curlError);
+        }
         curl_close($curl);
         
         $response = json_decode($responseRaw, true);
-        
         if (json_last_error() !== JSON_ERROR_NONE) {
-            echo "JSON Decode Error: " . json_last_error_msg();
-            exit;
+            return array('success' => false, 'message' => 'Sale #' . $SaleId . ': invalid FBR response.');
         }
         
         $invoiceStatuses = $response['validationResponse']['invoiceStatuses'] ?? [];
-        
         $errors = [];
         foreach ($invoiceStatuses as $item) {
             if (isset($item['status']) && strtolower($item['status']) === 'invalid') {
                 $itemNo = $item['itemSNo'] ?? 'N/A';
                 $errorCode = $item['errorCode'] ?? '';
                 $errorMsg = $item['error'] ?? 'Unknown error';
-                $errors[] = "Item {$itemNo} (Code {$errorCode}): {$errorMsg}";
+                $errors[] = "Sale #{$SaleId} item {$itemNo} (Code {$errorCode}): {$errorMsg}";
             }
         }
         
         if (!empty($errors)) {
-            $errorMessage = implode('<br>', $errors);
-            $this->session->set_flashdata('fbr_error', $errorMessage);
-            redirect('/Sales');
-            return;
+            return array('success' => false, 'message' => implode('<br>', $errors));
         }
         
-        // Extract invoice number if valid
         $invoiceNo = $response['invoiceNumber'] ?? null;
-        
-        if ($invoiceNo) {
-            $FbrNo = ['FbrNo' => $invoiceNo];
-            $this->db->set($FbrNo)->where('SaleId', $SaleId)->update('pos_sales');
+        if (!$invoiceNo) {
+            return array('success' => false, 'message' => 'Sale #' . $SaleId . ': invoice number not returned by FBR.');
+        }
+
+        $FbrNo = ['FbrNo' => $invoiceNo];
+        $this->db->set($FbrNo)->where('SaleId', $SaleId)->update('pos_sales');
+
+        return array('success' => true, 'invoice_no' => $invoiceNo, 'message' => 'Sale #' . $SaleId . ' posted successfully.');
+	}
+
+	public function  FBR($SaleId)
+	{
+        $result = $this->submitSaleToFbr((int) $SaleId);
+        if (!empty($result['success'])) {
             $this->session->set_flashdata('fbr_success', 'Invoice submitted successfully');
         } else {
-            $this->session->set_flashdata('fbr_error', 'Invoice number not returned by FBR.');
+            $this->session->set_flashdata('fbr_error', $result['message']);
         }
         
         redirect('/Sales');
-
 	}
+
+    public function BulkFBR()
+    {
+        $selectedSaleIds = $this->input->post('selected_sale_ids');
+        $saleIds = array();
+
+        if (is_array($selectedSaleIds)) {
+            $saleIds = $selectedSaleIds;
+        } else {
+            $saleIds = explode(',', (string) $selectedSaleIds);
+        }
+
+        $saleIds = array_values(array_unique(array_filter(array_map('intval', $saleIds))));
+
+        if (empty($saleIds)) {
+            $this->session->set_flashdata('fbr_error', 'Please select at least one sale for FBR posting.');
+            redirect('/Sales');
+            return;
+        }
+
+        $successCount = 0;
+        $errorMessages = array();
+
+        foreach ($saleIds as $saleId) {
+            $result = $this->submitSaleToFbr($saleId);
+            if (!empty($result['success'])) {
+                $successCount++;
+            } else {
+                $errorMessages[] = $result['message'];
+            }
+        }
+
+        if ($successCount > 0) {
+            $successMessage = $successCount . ' invoice(s) submitted to FBR successfully.';
+            if (!empty($errorMessages)) {
+                $successMessage .= ' Some records failed.';
+            }
+            $this->session->set_flashdata('fbr_success', $successMessage);
+        }
+
+        if (!empty($errorMessages)) {
+            $this->session->set_flashdata('fbr_error', implode('<br>', $errorMessages));
+        }
+
+        redirect('/Sales');
+    }
 	public function buildFbrItems($saleDetails, $scenarioId)
 	{
 		$items = [];
